@@ -2,13 +2,10 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-// Use an untyped Supabase client for admin inserts that bypass RLS.
-// The typed admin client resolves INSERT on providers to `never`
-// because the RLS INSERT policy restricts to auth.uid() = id.
-function createUntypedAdminClient() {
+function createAuthClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 }
 
@@ -17,15 +14,29 @@ export async function createProviderProfile(data: {
   email: string;
   internalName: string;
   clientAlias: string;
+  accessToken: string;
 }) {
-  const supabase = createUntypedAdminClient();
+  const authClient = createAuthClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await authClient.auth.getUser(data.accessToken);
+
+  if (authError || !user || user.id !== data.userId || user.email !== data.email) {
+    return { error: "You must be signed in to create a provider profile." };
+  }
+
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   const slug = data.clientAlias
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-  const { error } = await supabase.from("providers").insert({
+  const { error } = await adminClient.from("providers").insert({
     id: data.userId,
     email: data.email,
     internal_name: data.internalName,
