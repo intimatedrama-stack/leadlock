@@ -50,12 +50,19 @@ export default function SignUpPage() {
       return;
     }
 
+    if (!authData.user || !authData.session) {
+      setError("Email confirmation is required before your provider profile can be created.");
+      setLoading(false);
+      return;
+    }
+
     // 2. Create provider profile via server action (uses admin client)
     const { error: profileError } = await createProviderProfile({
-      userId: authData.user!.id,
+      userId: authData.user.id,
       email,
       internalName,
       clientAlias,
+      accessToken: authData.session.access_token,
     });
 
     if (profileError) {
